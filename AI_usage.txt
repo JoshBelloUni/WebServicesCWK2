@@ -1,5 +1,8 @@
 1. Use of json files for data storage over other data types
 
 2. AI used to help index words. However, i made the decision to also index the quote 
-as its hard to know the position based on just the number
+as its hard to know the position based on just the number, so having quote index and 
+potition helps make it clearer.
+
+
 

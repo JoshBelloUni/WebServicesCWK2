@@ -31,7 +31,7 @@ def crawl(base_url: str) -> dict:
             pages[url] = quotes
             pbar.update(1)
 
-            # follow the "Next" button if it exists
+            # follow the "Next" button
             next_btn = soup.find("li", class_="next")
             next_path = next_btn.find("a")["href"] if next_btn else None
 
