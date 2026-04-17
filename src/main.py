@@ -8,12 +8,13 @@ Commands:
   find <query> - Find pages containing query terms
 """
 
+import os
 from crawler import crawl
 from indexer import build_index, save_index, load_index
 from search import print_word, find_pages
 
 BASE_URL = "https://quotes.toscrape.com/"
-INDEX_PATH = "../data/index.json"
+INDEX_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "index.json")
 
 
 def main():
