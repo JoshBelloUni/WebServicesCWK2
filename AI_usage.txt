@@ -4,5 +4,6 @@
 as its hard to know the position based on just the number, so having quote index and 
 potition helps make it clearer.
 
-
+3. Advanced Feature: tag explorer. Idea was conceptualised by myself, but AI was used
+to develop it with TF-IDF.
 

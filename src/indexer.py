@@ -41,5 +41,7 @@ def save_index(index: dict, filepath: str) -> None:
 
 def load_index(filepath: str) -> dict:
     """Load the inverted index from a file."""
+    if not os.path.exists(filepath):
+        return {}
     with open(filepath, "r", encoding="utf-8") as f:
         return json.load(f)
