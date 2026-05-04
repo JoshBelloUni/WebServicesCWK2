@@ -4,6 +4,7 @@ test_crawler.py - Tests for the crawler module
 
 import time
 import pytest
+import requests
 from unittest.mock import patch, MagicMock
 from src.crawler import crawl
 from src.indexer import build_index
@@ -44,10 +45,15 @@ PAGE_NO_QUOTES_HTML = """
 PAGE_1_URL = "https://quotes.toscrape.com/"
 
 
-def _response(html):
+def _response(html, status_code=200):
     """Return a mock requests.Response with the given HTML as content."""
     mock = MagicMock()
     mock.content = html.encode("utf-8")
+    mock.status_code = status_code
+    if status_code >= 400:
+        mock.raise_for_status.side_effect = requests.exceptions.HTTPError(str(status_code))
+    else:
+        mock.raise_for_status.return_value = None
     return mock
 
 
@@ -115,6 +121,35 @@ def test_crawl_handles_page_with_no_quotes():
     # test if a page with no quotes is empty
     pages = _crawl(PAGE_NO_QUOTES_HTML)
     assert pages["https://quotes.toscrape.com/"] == []
+
+def test_crawl_retries_on_error_then_succeeds():
+    # first attempt raises a connection error, second attempt succeeds
+    side_effects = [
+        requests.exceptions.ConnectionError("transient error"),
+        _response(PAGE_1_HTML),
+        _response(PAGE_2_HTML),
+    ]
+    with patch("src.crawler.requests.get", side_effect=side_effects), \
+         patch("src.crawler.time.sleep"), \
+         patch("src.crawler.tqdm", return_value=MagicMock()):
+        pages = crawl("https://quotes.toscrape.com")
+    assert PAGE_1_URL in pages
+
+def test_crawl_raises_after_max_retries():
+    # all attempts raise a connection error — expect RuntimeError with message
+    with patch("src.crawler.requests.get", side_effect=requests.exceptions.ConnectionError("down")), \
+         patch("src.crawler.time.sleep"), \
+         patch("src.crawler.tqdm", return_value=MagicMock()):
+        with pytest.raises(RuntimeError, match="Crawler failed due to connection error"):
+            crawl("https://quotes.toscrape.com")
+
+def test_crawl_raises_on_404_after_max_retries():
+    # all attempts return 404 — expect RuntimeError with message
+    with patch("src.crawler.requests.get", return_value=_response(PAGE_NO_QUOTES_HTML, status_code=404)), \
+         patch("src.crawler.time.sleep"), \
+         patch("src.crawler.tqdm", return_value=MagicMock()):
+        with pytest.raises(RuntimeError, match="Crawler failed due to connection error"):
+            crawl("https://quotes.toscrape.com")
 
 
 # ---------------------------------------------------------------------------

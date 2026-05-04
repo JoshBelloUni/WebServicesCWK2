@@ -5,7 +5,7 @@ as its hard to know the position based on just the number, so having quote index
 potition helps make it clearer.
 
 3. Advanced Feature: tag explorer. Idea was conceptualised by myself, but AI was used
-to develop it with TF-IDF.
+to develop it with TF-IDF. Includes the generation of the stopword list.
 
 4. AI helped generate all test cases. Performance testing was initially done with mocked 
 data, but I decided to switch this to also check performance of the entire system
@@ -13,4 +13,5 @@ data, but I decided to switch this to also check performance of the entire syste
 5. Cross Module Tests: AI thought of Cross module tests which cover multiple functions
 that unit tests may miss
 
-6. Generating the long readme table detailing the tests and the Descriptions
+6. Generating the long readme table detailing the tests and the Descriptions using the 
+comments in each test.
