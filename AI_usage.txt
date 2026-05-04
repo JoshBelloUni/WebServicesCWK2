@@ -7,3 +7,8 @@ potition helps make it clearer.
 3. Advanced Feature: tag explorer. Idea was conceptualised by myself, but AI was used
 to develop it with TF-IDF.
 
+4. AI helped generate test cases. Performance testing was initially done with mocked 
+data, but I decided to switch this to also check performance of the entire system
+
+5. Cross Module Tests: AI thought of Cross module tests which cover multiple functions
+that unit tests may miss

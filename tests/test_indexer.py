@@ -2,8 +2,10 @@
 test_indexer.py - Tests for the indexer module
 """
 
+import time
 import pytest
 from src.indexer import build_index, save_index, load_index
+from src.search import find_pages
 
 # ---------------------------------------------------------------------------
 # Shared test data
@@ -111,3 +113,99 @@ def test_load_index_restores_saved_data(tmp_path):
     loaded = load_index(filepath)
     assert loaded.keys() == index.keys()
     assert loaded["stay"] == index["stay"]
+
+
+# ---------------------------------------------------------------------------
+# Helper for large datasets
+# ---------------------------------------------------------------------------
+
+def _make_large_pages(n_pages=100, quotes_per_page=10):
+    """Generate a large pages dict for performance testing."""
+    vocab = ["wisdom", "courage", "life", "love", "change", "hope", "truth", "fear", "joy", "peace"]
+    pages = {}
+    for i in range(n_pages):
+        url = f"https://quotes.toscrape.com/page/{i}/"
+        pages[url] = [
+            {"text": " ".join(vocab[(i + j) % len(vocab):] + vocab[:(i + j) % len(vocab)]),
+             "author": f"Author {j}", "tags": [f"tag{j % 3}"]}
+            for j in range(quotes_per_page)
+        ]
+    return pages
+
+
+# ---------------------------------------------------------------------------
+# Cross-module tests
+# ---------------------------------------------------------------------------
+
+def test_full_pipeline_build_save_load_search(tmp_path):
+    # tests the full pipeline: build index, save to disk, load it back, then search
+    index = build_index(PAGES)
+    filepath = str(tmp_path / "index.json")
+    save_index(index, filepath)
+    loaded = load_index(filepath)
+    results = find_pages(loaded, "stay")
+    assert "https://quotes.toscrape.com/" in results
+
+def test_search_results_identical_before_and_after_round_trip(tmp_path):
+    # tests that a saved and reloaded index returns identical search results to the original
+    index = build_index(PAGES)
+    filepath = str(tmp_path / "index.json")
+    save_index(index, filepath)
+    loaded = load_index(filepath)
+    assert find_pages(index, "change") == find_pages(loaded, "change")
+
+
+# ---------------------------------------------------------------------------
+# Performance tests
+# ---------------------------------------------------------------------------
+
+def test_build_index_performance_large_dataset():
+    # tests that building an index from 100 pages x 10 quotes completes within 2 seconds
+    pages = _make_large_pages(100, 10)
+    start = time.time()
+    index = build_index(pages)
+    elapsed = time.time() - start
+    assert len(index) > 0
+    assert elapsed < 2.0, f"build_index on 1000 quotes took {elapsed:.2f}s — too slow"
+
+def test_save_load_performance_large_index(tmp_path):
+    # tests that saving and loading a large index each complete within 1 second
+    index = build_index(_make_large_pages(100, 10))
+    filepath = str(tmp_path / "index.json")
+    start = time.time()
+    save_index(index, filepath)
+    save_time = time.time() - start
+    start = time.time()
+    load_index(filepath)
+    load_time = time.time() - start
+    assert save_time < 1.0, f"save_index took {save_time:.2f}s — too slow"
+    assert load_time < 1.0, f"load_index took {load_time:.2f}s — too slow"
+
+
+# ---------------------------------------------------------------------------
+# Integration tests (require --run-integration; hit the real site)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.integration
+def test_real_build_index_contains_common_words(real_pages):
+    # tests that indexing real crawled data produces entries for common quote words
+    index = build_index(real_pages)
+    assert "life" in index or "love" in index or "change" in index
+
+@pytest.mark.integration
+def test_real_index_word_entries_have_correct_structure(real_pages):
+    # tests that every entry in the real index has a valid frequency and positions list
+    index = build_index(real_pages)
+    for pages in index.values():
+        for stats in pages.values():
+            assert "frequency" in stats and stats["frequency"] > 0
+            assert "positions" in stats and isinstance(stats["positions"], list)
+
+@pytest.mark.integration
+def test_real_save_and_load_preserves_all_words(real_pages, tmp_path):
+    # tests that saving and loading a built index produces identical word keys
+    index = build_index(real_pages)
+    filepath = str(tmp_path / "index.json")
+    save_index(index, filepath)
+    loaded = load_index(filepath)
+    assert loaded.keys() == index.keys()

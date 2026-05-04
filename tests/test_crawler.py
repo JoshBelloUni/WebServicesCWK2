@@ -2,9 +2,11 @@
 test_crawler.py - Tests for the crawler module
 """
 
+import time
 import pytest
 from unittest.mock import patch, MagicMock
 from src.crawler import crawl
+from src.indexer import build_index
 
 # ---------------------------------------------------------------------------
 # Fake HTML pages that mirror the structure of quotes.toscrape.com
@@ -113,3 +115,77 @@ def test_crawl_handles_page_with_no_quotes():
     # test if a page with no quotes is empty
     pages = _crawl(PAGE_NO_QUOTES_HTML)
     assert pages["https://quotes.toscrape.com/"] == []
+
+
+# ---------------------------------------------------------------------------
+# Cross-module tests
+# ---------------------------------------------------------------------------
+
+def test_crawl_all_quotes_have_required_fields():
+    # tests that every quote on every page has text, author, and tags fields
+    pages = _crawl(PAGE_1_HTML, PAGE_2_HTML)
+    for quotes in pages.values():
+        for quote in quotes:
+            assert "text" in quote and "author" in quote and "tags" in quote
+
+def test_crawl_output_feeds_into_build_index():
+    # tests that crawl output can be passed directly to build_index without errors
+    pages = _crawl(PAGE_1_HTML, PAGE_2_HTML)
+    index = build_index(pages)
+    assert isinstance(index, dict)
+    assert len(index) > 0
+
+def test_crawl_multi_page_quote_counts_are_correct():
+    # tests that the number of quotes per page matches what was in the HTML
+    pages = _crawl(PAGE_1_HTML, PAGE_2_HTML)
+    assert len(pages["https://quotes.toscrape.com/"]) == 1
+    assert len(pages["https://quotes.toscrape.com/page/2/"]) == 1
+
+
+# ---------------------------------------------------------------------------
+# Performance tests
+# ---------------------------------------------------------------------------
+
+def test_crawl_full_site_performance():
+    # tests that a full crawl of the real site completes within 120 seconds;
+    # includes genuine network latency and the 6-second politeness delay between pages
+    start = time.time()
+    result = crawl("https://quotes.toscrape.com")
+    elapsed = time.time() - start
+    assert len(result) > 0
+    assert elapsed < 120.0, f"full site crawl took {elapsed:.2f}s — too slow"
+
+
+# ---------------------------------------------------------------------------
+# Integration tests (require --run-integration; hit the real site)
+#
+# These tests use 'real_pages' which are real pages crawled using the crawler
+# ---------------------------------------------------------------------------
+
+@pytest.mark.integration
+def test_real_crawl_returns_multiple_pages(real_pages):
+    # tests that the real site returns more than one page of quotes
+    assert len(real_pages) > 1
+
+@pytest.mark.integration
+def test_real_crawl_all_quotes_have_required_fields(real_pages):
+    # tests that every quote from the real site contains text, author, and tags
+    for quotes in real_pages.values():
+        for quote in quotes:
+            assert "text" in quote and "author" in quote and "tags" in quote
+
+@pytest.mark.integration
+def test_real_crawl_quotes_have_non_empty_text_and_author(real_pages):
+    # tests that text and author from the real site are non-empty strings
+    for quotes in real_pages.values():
+        for quote in quotes:
+            assert len(quote["text"]) > 0
+            assert len(quote["author"]) > 0
+
+@pytest.mark.integration
+def test_real_crawl_tags_are_lists_of_strings(real_pages):
+    # tests that every tags field from the real site is a list of strings
+    for quotes in real_pages.values():
+        for quote in quotes:
+            assert isinstance(quote["tags"], list)
+            assert all(isinstance(t, str) for t in quote["tags"])
